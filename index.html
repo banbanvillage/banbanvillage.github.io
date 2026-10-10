@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>伴伴村莊｜預約</title>
+<link rel="icon" href="logo.jpg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrapper">
+  <div class="hero">
+    <img class="logo" src="logo.jpg" alt="伴伴村莊 Logo">
+    <h1>伴伴村莊</h1>
+    <div class="subtitle">大人有伴，孩子也有伴。<br>選一個舒服的時間，一起來村莊坐坐吧。</div>
+    <div class="badges">
+      <span class="badge" id="badgeCapacity">每時段最多 4 組</span>
+      <span class="badge">週三、週日公休</span>
+      <span class="badge">1 大 1 小 NT$300</span>
+    </div>
+  </div>
+
+  <div id="bookingArea">
+    <div class="tabs">
+      <button type="button" class="tab active" id="tabGeneral" onclick="switchMode('general')">🌿 一般入村預約</button>
+      <button type="button" class="tab" id="tabCourse" onclick="switchMode('course')">🎨 才藝課程</button>
+    </div>
+
+    <!-- 一般預約：日期與時段 -->
+    <div class="card" id="generalPick">
+      <div class="section-title">🌿 選擇日期與時段</div>
+      <div class="notice" id="generalNotice">每個時段最多開放 <strong>4 組親子</strong>。<br>額滿後就不能再選，週三、週日為公休日。</div>
+      <div class="field">
+        <label>預約日期 <span class="required">*</span></label>
+        <input type="date" id="bookingDate" onchange="loadAvailability()">
+      </div>
+      <div id="dateMessage"></div>
+      <div id="slots" class="slots"></div>
+    </div>
+
+    <!-- 才藝課程：選課 -->
+    <div class="card hidden" id="coursePick">
+      <div class="section-title">🎨 選擇才藝課程</div>
+      <div class="notice">課程名額以<strong>幼兒人數</strong>計算，費用依報名幼兒人數計算，陪同大人不另收費。</div>
+      <div id="courseList" class="course-list"><div class="loading-box">正在讀取課程……</div></div>
+    </div>
+
+    <!-- 共用：報名資料 -->
+    <div class="card">
+      <div class="section-title">👨‍👩‍👧‍👦 誰要來伴伴村莊？</div>
+      <div class="grid2">
+        <div class="field"><label>姓名 <span class="required">*</span></label><input id="parent1" placeholder="例如：林志玲" maxlength="50"></div>
+        <div class="field"><label>第二位姓名</label><input id="parent2" placeholder="選填" maxlength="50" oninput="updatePrice()"></div>
+      </div>
+
+      <div class="field"><label>寶寶 1 姓名或小名 <span class="required">*</span></label><input id="baby1" placeholder="例如：豆豆" maxlength="30" oninput="updatePrice()"></div>
+      <div class="field"><label>寶寶 1 年齡 <span class="required">*</span></label><div class="age-selects"><div class="age-select-wrap"><select id="baby1AgeY"></select><span>歲</span></div><div class="age-select-wrap"><select id="baby1AgeM"></select><span>月</span></div></div></div>
+
+      <div class="field"><label>寶寶 2 姓名或小名</label><input id="baby2" placeholder="選填" maxlength="30" oninput="updatePrice()"></div>
+      <div class="field"><label>寶寶 2 年齡</label><div class="age-selects"><div class="age-select-wrap"><select id="baby2AgeY"></select><span>歲</span></div><div class="age-select-wrap"><select id="baby2AgeM"></select><span>月</span></div></div></div>
+
+      <div class="field"><label>寶寶 3 姓名或小名</label><input id="baby3" placeholder="選填" maxlength="30" oninput="updatePrice()"></div>
+      <div class="field"><label>寶寶 3 年齡</label><div class="age-selects"><div class="age-select-wrap"><select id="baby3AgeY"></select><span>歲</span></div><div class="age-select-wrap"><select id="baby3AgeM"></select><span>月</span></div></div></div>
+
+      <div class="grid2">
+        <div class="field"><label>手機 <span class="required">*</span></label><input id="phone" type="tel" placeholder="09xxxxxxxx" maxlength="20"></div>
+        <div class="field"><label>E-Mail <span class="required">*</span></label><input id="email" type="email" placeholder="example@gmail.com" maxlength="100"></div>
+      </div>
+
+      <div class="price-box">
+        <div style="font-size:13px;color:#8d7d73">本次預估費用</div>
+        <div class="price" id="price">NT$ 300</div>
+        <div style="font-size:12px;color:#94847b" id="priceRule">1 大 1 小 300 元，每增加 1 位大人或小孩 +100 元</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">☕ 這次想來村莊做什麼呢？</div>
+      <div class="checkbox-item"><input type="checkbox" class="need" value="認識新朋友" id="need1"><label for="need1">認識新朋友</label></div>
+      <div class="checkbox-item"><input type="checkbox" class="need" value="有點喘息時間" id="need2"><label for="need2">有點喘息時間</label></div>
+      <div class="checkbox-item"><input type="checkbox" class="need" value="想與孩子有精緻的共玩時光" id="need3"><label for="need3">想與孩子有精緻的共玩時光</label></div>
+      <div class="checkbox-item"><input type="checkbox" class="need" value="教養資訊的諮詢" id="need4"><label for="need4">教養資訊的諮詢</label></div>
+      <div class="checkbox-item"><input type="checkbox" class="need" value="其他" id="need5"><label for="need5">其他</label></div>
+      <div class="field" style="margin-top:14px"><label>其他想告訴我們的需求</label><textarea id="otherNeed" rows="3" maxlength="1000" placeholder="可以簡單跟我們說說…"></textarea></div>
+    </div>
+
+    <button id="submitBtn" onclick="submitBooking()">確認預約</button>
+    <div id="submitMessage" class="message"></div>
+    <div style="text-align:center;font-size:12px;color:#9a8c83;margin-top:14px;line-height:1.6">預約送出後會立即收到確認信；預約開始前約 24 小時會再收到提醒。</div>
+  </div>
+
+  <div id="successArea" class="success-box hidden">
+    <div style="font-size:52px">🌷</div>
+    <h2 style="color:#a96e4e" id="successTitle">預約成功！</h2>
+    <p>我們已經收到你的預約，<br>預約確認信也已寄到你的 Email。</p>
+    <div id="successInfo" class="notice"></div>
+    <p style="font-size:14px;color:#887970">確認信中會有「查看／管理我的預約」，可查看內容並選擇保留或取消；預約開始前約 24 小時也會再寄提醒。</p>
+    <button type="button" class="secondary-btn" onclick="location.reload()">再預約一筆</button>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script>
+var CFG = { maxBookings:4, capacityUnit:'group', basePrice:300, extraPrice:100 };
+var mode = 'general';
+var selectedSlot = '';
+var selectedCourse = null;
+var courses = [];
+var coursesLoaded = false;
+
+/* ---------- 初始化 ---------- */
+function initAgeSelects() {
+  ['baby1','baby2','baby3'].forEach(function (p) {
+    var y = document.getElementById(p + 'AgeY'), m = document.getElementById(p + 'AgeM');
+    var yh = '<option value="">歲</option>', mh = '<option value="">月</option>';
+    for (var i = 0; i <= 18; i++) yh += '<option value="' + i + '">' + i + '</option>';
+    for (var j = 0; j <= 11; j++) mh += '<option value="' + j + '">' + j + '</option>';
+    y.innerHTML = yh; m.innerHTML = mh;
+  });
+}
+
+function localToday() {
+  var t = new Date();
+  return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+}
+
+function applyConfig() {
+  var unit = CFG.capacityUnit === 'child' ? '位幼兒' : '組';
+  document.getElementById('badgeCapacity').innerText = '每時段最多 ' + CFG.maxBookings + ' ' + unit;
+  document.getElementById('generalNotice').innerHTML =
+    '每個時段最多開放 <strong>' + CFG.maxBookings + (CFG.capacityUnit === 'child' ? ' 位幼兒' : ' 組親子') + '</strong>。<br>額滿後就不能再選，週三、週日為公休日。';
+  updatePrice();
+}
+
+function loadConfig() {
+  api('config').then(function (r) {
+    if (r && r.success) {
+      CFG = r;
+      if (r.today) document.getElementById('bookingDate').min = r.today;
+      applyConfig();
+    }
+  }).catch(function () { /* 用預設值即可 */ });
+}
+
+/* ---------- 切換一般／課程 ---------- */
+function switchMode(m) {
+  mode = m;
+  document.getElementById('tabGeneral').classList.toggle('active', m === 'general');
+  document.getElementById('tabCourse').classList.toggle('active', m === 'course');
+  document.getElementById('generalPick').classList.toggle('hidden', m !== 'general');
+  document.getElementById('coursePick').classList.toggle('hidden', m !== 'course');
+  document.getElementById('submitBtn').innerText = m === 'course' ? '確認報名' : '確認預約';
+  document.getElementById('submitMessage').innerText = '';
+  if (m === 'course' && !coursesLoaded) loadCourses();
+  updatePrice();
+}
+
+/* ---------- 一般時段 ---------- */
+function loadAvailability() {
+  var d = document.getElementById('bookingDate').value;
+  var box = document.getElementById('slots'), msg = document.getElementById('dateMessage');
+  selectedSlot = '';
+  msg.innerHTML = '';
+  if (!d) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="loading-box">正在確認名額……</div>';
+
+  api('availability', { date:d }).then(function (r) {
+    if (document.getElementById('bookingDate').value !== d) return;
+    showAvailability(r);
+  }).catch(function (err) {
+    box.innerHTML = '';
+    msg.innerHTML = '<div class="error-box">' + escapeHtml(err.message) + '<br><button class="link-btn" onclick="loadAvailability()">重新讀取</button></div>';
+  });
+}
+
+function showAvailability(r) {
+  var c = document.getElementById('slots'), m = document.getElementById('dateMessage');
+  c.innerHTML = ''; m.innerHTML = '';
+
+  if (!r || !r.success) {
+    m.innerHTML = '<div class="notice">' + escapeHtml(r && r.message ? r.message : '讀取失敗，請稍後再試。') + '</div>';
+    return;
+  }
+
+  var unit = r.unitLabel || '組';
+
+  r.slots.forEach(function (item) {
+    var d = document.createElement('div');
+    var off = item.full || item.closed;
+    d.className = 'slot' + (item.closed ? ' closed' : item.full ? ' disabled' : '');
+    var p = Math.min(100, item.count / item.capacity * 100);
+    var label = item.closed
+      ? '臨時暫停開放' + (item.closedReason ? '（' + escapeHtml(item.closedReason) + '）' : '')
+      : (item.full ? '已額滿 ' : '目前 ') + item.count + ' / ' + item.capacity + ' ' + unit;
+    d.innerHTML = '<div class="slot-time">' + escapeHtml(item.slot) + '</div><div class="slot-count">' + label + '</div>' +
+      (item.closed ? '' : '<div class="slot-bar"><span style="width:' + p + '%"></span></div>');
+    if (!off) {
+      d.onclick = function () {
+        document.querySelectorAll('#slots .slot').forEach(function (x) { x.classList.remove('selected'); });
+        d.classList.add('selected');
+        selectedSlot = item.slot;
+      };
+    }
+    c.appendChild(d);
+  });
+}
+
+/* ---------- 才藝課程 ---------- */
+function loadCourses() {
+  var box = document.getElementById('courseList');
+  box.innerHTML = '<div class="loading-box">正在讀取課程……</div>';
+
+  api('courses').then(function (r) {
+    if (!r || !r.success) throw Object.assign(new Error((r && r.message) || '讀取失敗'), { isApi:true });
+    coursesLoaded = true;
+    courses = r.courses || [];
+    renderCourses();
+  }).catch(function (err) {
+    box.innerHTML = '<div class="error-box">' + escapeHtml(err.message) + '<br><button class="link-btn" onclick="loadCourses()">重新讀取</button></div>';
+  });
+}
+
+function renderCourses() {
+  var box = document.getElementById('courseList');
+  box.innerHTML = '';
+
+  if (!courses.length) {
+    box.innerHTML = '<div class="notice" style="margin:0;text-align:center">目前沒有開放報名的課程，敬請期待 🌱</div>';
+    return;
+  }
+
+  var wanted = qs('course');
+
+  courses.forEach(function (c) {
+    var d = document.createElement('div');
+    d.className = 'course' + (c.full ? ' disabled' : '');
+    d.innerHTML =
+      '<div class="course-name">' + escapeHtml(c.name) +
+        (c.full ? '<span class="course-tag full">已額滿</span>' : '<span class="course-tag">剩 ' + c.remaining + ' 位</span>') + '</div>' +
+      '<div class="course-meta">📅 ' + escapeHtml(c.date) + weekdayText(c.date) + '　🕒 ' + escapeHtml(c.timeSlot) + '<br>' +
+        '💰 每位幼兒 NT$ ' + c.price + '　👶 名額 ' + c.used + ' / ' + c.capacity + ' 位幼兒</div>' +
+      (c.description ? '<div class="course-desc">' + escapeHtml(c.description) + '</div>' : '');
+
+    if (!c.full) {
+      d.onclick = function () { selectCourse(c, d); };
+      if (wanted && wanted === c.id) setTimeout(function () { selectCourse(c, d); }, 0);
+    }
+    box.appendChild(d);
+  });
+}
+
+function selectCourse(c, el) {
+  document.querySelectorAll('#courseList .course').forEach(function (x) { x.classList.remove('selected'); });
+  el.classList.add('selected');
+  selectedCourse = c;
+  updatePrice();
+}
+
+/* ---------- 價格 ---------- */
+function childrenCount() {
+  return ['baby1','baby2','baby3'].filter(function (id) { return document.getElementById(id).value.trim(); }).length || 1;
+}
+
+function updatePrice() {
+  var priceEl = document.getElementById('price'), rule = document.getElementById('priceRule');
+
+  if (mode === 'course') {
+    var kids = childrenCount();
+    if (selectedCourse) {
+      priceEl.innerText = 'NT$ ' + (selectedCourse.price * kids);
+      rule.innerText = '每位幼兒 NT$ ' + selectedCourse.price + ' × ' + kids + ' 位，陪同大人不另收費';
+    } else {
+      priceEl.innerText = 'NT$ —';
+      rule.innerText = '請先選擇課程';
+    }
+    return;
+  }
+
+  var n = 2;
+  if (document.getElementById('parent2').value.trim()) n++;
+  if (document.getElementById('baby2').value.trim()) n++;
+  if (document.getElementById('baby3').value.trim()) n++;
+  priceEl.innerText = 'NT$ ' + (CFG.basePrice + Math.max(0, n - 2) * CFG.extraPrice);
+  rule.innerText = '1 大 1 小 ' + CFG.basePrice + ' 元，每增加 1 位大人或小孩 +' + CFG.extraPrice + ' 元';
+}
+
+/* ---------- 送出 ---------- */
+function val(id) { return document.getElementById(id).value.trim(); }
+
+function submitBooking() {
+  var msg = document.getElementById('submitMessage');
+  var err = function (t) { msg.innerText = t; alert(t); };
+
+  if (mode === 'general') {
+    if (!val('bookingDate')) return err('請選擇預約日期');
+    if (!selectedSlot) return err('請選擇預約時段');
+  } else {
+    if (!selectedCourse) return err('請選擇要報名的課程');
+  }
+
+  if (!val('parent1')) return err('請填寫姓名');
+  if (!val('baby1')) return err('請填寫寶寶姓名或小名');
+  if (val('baby1AgeY') === '' || val('baby1AgeM') === '') return err('請選擇寶寶 1 的年齡（歲與月）');
+  if (val('baby2') && (val('baby2AgeY') === '' || val('baby2AgeM') === '')) return err('有填寫寶寶 2 時，也請選擇寶寶 2 的年齡');
+  if (val('baby3') && (val('baby3AgeY') === '' || val('baby3AgeM') === '')) return err('有填寫寶寶 3 時，也請選擇寶寶 3 的年齡');
+  if (!val('phone')) return err('請填寫手機');
+  if (!val('email')) return err('請填寫 Email');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val('email'))) return err('Email 格式似乎不正確');
+
+  if (mode === 'course' && childrenCount() > selectedCourse.remaining) {
+    return err('這堂課程只剩 ' + selectedCourse.remaining + ' 位幼兒名額，請調整報名人數');
+  }
+
+  var b2 = val('baby2'), b3 = val('baby3');
+  var data = {
+    type: mode,
+    courseId: mode === 'course' ? selectedCourse.id : '',
+    date: mode === 'general' ? val('bookingDate') : '',
+    timeSlot: mode === 'general' ? selectedSlot : '',
+    parent1: val('parent1'), parent2: val('parent2'),
+    baby1: val('baby1'), baby2: b2, baby3: b3,
+    baby1AgeY: val('baby1AgeY'), baby1AgeM: val('baby1AgeM'),
+    baby2AgeY: b2 ? val('baby2AgeY') : '', baby2AgeM: b2 ? val('baby2AgeM') : '',
+    baby3AgeY: b3 ? val('baby3AgeY') : '', baby3AgeM: b3 ? val('baby3AgeM') : '',
+    phone: val('phone'), email: val('email'),
+    needs: Array.from(document.querySelectorAll('.need:checked')).map(function (x) { return x.value; }),
+    otherNeed: val('otherNeed')
+  };
+
+  var btn = document.getElementById('submitBtn');
+  var label = btn.innerText;
+  btn.disabled = true;
+  btn.innerText = '正在幫你預約……';
+  msg.innerText = '';
+
+  api('submitBooking', { data:data }).then(function (r) {
+    btn.disabled = false;
+    btn.innerText = label;
+
+    if (!r || !r.success) {
+      msg.innerText = (r && r.message) || '預約發生錯誤，請稍後再試。';
+      if (mode === 'general') loadAvailability(); else loadCourses();
+      return;
+    }
+
+    document.getElementById('bookingArea').classList.add('hidden');
+    document.getElementById('successArea').classList.remove('hidden');
+    document.getElementById('successTitle').innerText = r.type === '課程' ? '課程報名成功！' : '預約成功！';
+    document.getElementById('successInfo').innerHTML =
+      (r.courseName ? '課程：<strong>' + escapeHtml(r.courseName) + '</strong><br>' : '') +
+      '日期：<strong>' + escapeHtml(r.date) + weekdayText(r.date) + ' ' + escapeHtml(r.timeSlot) + '</strong><br>' +
+      '預約編號：<strong>' + escapeHtml(r.bookingId) + '</strong><br>' +
+      '預估費用：<strong>NT$ ' + r.totalPrice + '</strong>';
+    window.scrollTo(0, 0);
+
+  }).catch(function (e) {
+    btn.disabled = false;
+    btn.innerText = label;
+    msg.innerText = e.message + '（如果不確定是否預約成功，請先檢查 Email 信箱，避免重複預約）';
+  });
+}
+
+/* ---------- 啟動 ---------- */
+initAgeSelects();
+document.getElementById('bookingDate').min = localToday();
+updatePrice();
+loadConfig();
+if (qs('course') || qs('tab') === 'course') switchMode('course');
+</script>
+</body>
+</html>

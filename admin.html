@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>伴伴村莊｜預約管理</title>
+<link rel="icon" href="logo.jpg">
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<div id="loginArea" class="login">
+  <img class="logo" src="logo.jpg" alt="伴伴村莊 Logo">
+  <h2 style="color:#a56d50">伴伴村莊</h2>
+  <p>預約管理後台</p>
+  <input id="password" type="password" placeholder="請輸入管理密碼" autocomplete="current-password">
+  <button class="btn" id="loginBtn" onclick="login()">登入管理</button>
+  <div id="loginMessage" style="margin-top:12px;color:#b56f65;line-height:1.6"></div>
+</div>
+
+<div id="adminArea" class="container hidden">
+  <div class="header">
+    <div class="brand-wrap">
+      <img class="logo" src="logo.jpg" alt="伴伴村莊 Logo">
+      <div class="brand"><h1>伴伴村莊｜預約管理</h1><p>預約、課程、臨時店休與現場收款</p></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn secondary" onclick="refreshCurrent()">重新整理</button>
+      <button class="btn secondary" onclick="logout()">登出</button>
+    </div>
+  </div>
+
+  <div class="admin-tabs">
+    <button class="admin-tab active" data-tab="calendar" onclick="switchTab('calendar')">📅 預約月曆</button>
+    <button class="admin-tab" data-tab="courses" onclick="switchTab('courses')">🎨 才藝課程</button>
+    <button class="admin-tab" data-tab="closures" onclick="switchTab('closures')">🚧 臨時店休</button>
+  </div>
+
+  <!-- ============ 預約月曆 ============ -->
+  <div id="panel-calendar">
+    <div class="stats">
+      <div class="stat"><div class="stat-label">本月有效預約</div><div class="stat-value" id="activeCount">0</div></div>
+      <div class="stat"><div class="stat-label">本月應收</div><div class="stat-value" id="expectedRevenue">NT$ 0</div></div>
+      <div class="stat"><div class="stat-label">已收款</div><div class="stat-value green" id="paidRevenue">NT$ 0</div></div>
+      <div class="stat"><div class="stat-label">未收款</div><div class="stat-value red" id="unpaidRevenue">NT$ 0</div></div>
+      <div class="stat"><div class="stat-label">本月取消</div><div class="stat-value" id="cancelledCount">0</div></div>
+    </div>
+    <div class="card">
+      <div class="toolbar">
+        <div class="month-nav">
+          <button class="btn secondary" onclick="previousMonth()">‹ 上個月</button>
+          <div id="monthTitle" class="month-title"></div>
+          <button class="btn secondary" onclick="nextMonth()">下個月 ›</button>
+        </div>
+        <div class="legend">
+          <span><i class="dot empty"></i> 0 組</span>
+          <span><i class="dot open"></i> 尚有名額</span>
+          <span><i class="dot full"></i> 已額滿</span>
+          <span><i class="dot course"></i> 才藝課程</span>
+          <span><i class="dot off"></i> 臨時店休</span>
+          <span><i class="dot closed"></i> 公休</span>
+        </div>
+      </div>
+      <div class="week"><div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div></div>
+      <div id="calendar" class="calendar"></div>
+    </div>
+  </div>
+
+  <!-- ============ 才藝課程 ============ -->
+  <div id="panel-courses" class="hidden">
+    <div class="card" style="margin-bottom:18px">
+      <div class="panel-title" id="courseFormTitle">新增才藝課程</div>
+      <input type="hidden" id="cId">
+      <div class="form-grid">
+        <div class="f span2"><label>課程名稱 *</label><input id="cName" maxlength="40" placeholder="例如：親子律動小教室"></div>
+        <div class="f"><label>日期 *</label><input id="cDate" type="date"></div>
+        <div class="f"><label>狀態</label><select id="cStatus"><option value="開放">開放報名</option><option value="關閉">關閉（前台不顯示）</option></select></div>
+        <div class="f"><label>開始時間 *</label><input id="cStart" type="time" step="300"></div>
+        <div class="f"><label>結束時間 *</label><input id="cEnd" type="time" step="300"></div>
+        <div class="f"><label>每位幼兒收費 (NT$) *</label><input id="cPrice" type="number" min="0" step="10"></div>
+        <div class="f"><label>名額（幼兒人數）*</label><input id="cCapacity" type="number" min="1" max="50" step="1"></div>
+        <div class="f span4"><label>課程說明（選填，會顯示在前台）</label><textarea id="cDesc" rows="2" maxlength="300" placeholder="例如：適合 1–3 歲，請穿著方便活動的衣服"></textarea></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn" id="courseSaveBtn" onclick="saveCourse()">儲存課程</button>
+        <button class="btn light hidden" id="courseCancelEdit" onclick="resetCourseForm()">取消編輯</button>
+      </div>
+      <div class="form-msg" id="courseMsg"></div>
+    </div>
+
+    <div class="card">
+      <div class="panel-title">課程列表</div>
+      <div id="courseList" class="list"><div class="empty-note">載入中……</div></div>
+    </div>
+  </div>
+
+  <!-- ============ 臨時店休 ============ -->
+  <div id="panel-closures" class="hidden">
+    <div class="card" style="margin-bottom:18px">
+      <div class="panel-title">設定臨時店休</div>
+      <div class="form-grid">
+        <div class="f"><label>日期 *</label><input id="xDate" type="date" onchange="previewClosure()"></div>
+        <div class="f"><label>範圍 *</label><select id="xSlot" onchange="previewClosure()"></select></div>
+        <div class="f span2"><label>原因（會寫在取消通知信裡）</label><input id="xReason" maxlength="60" placeholder="例如：颱風停班、場地整修"></div>
+      </div>
+      <div id="xAffected"></div>
+      <div class="form-actions"><button class="btn" id="closureBtn" onclick="addClosure()">設定店休</button></div>
+      <div class="form-msg" id="closureMsg"></div>
+    </div>
+
+    <div class="card">
+      <div class="panel-title">即將到來的臨時店休</div>
+      <div id="closureList" class="list"><div class="empty-note">載入中……</div></div>
+    </div>
+  </div>
+</div>
+
+<div id="overlay" class="overlay" onclick="overlayClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div><h2 id="modalTitle"></h2><div id="modalSubtitle" style="color:#8c7e75;font-size:13px;margin-top:5px"></div></div>
+      <button class="close" onclick="closeModal()">關閉</button>
+    </div>
+    <div id="modalContent"></div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script>
+var adminPassword = '';
+var currentDate = new Date();
+var currentTab = 'calendar';
+var month = { bookings:[], courses:[], closures:[], slots:[], maxBookings:4, capacityUnit:'group', closedWeekdays:[0,3] };
+var adminCourses = [];
+var WHOLE_DAY = '整天';
+var SLOTS = ['09:30-11:00','12:30-14:00','14:30-16:00','19:00-20:30'];
+
+/* ---------- 共用 ---------- */
+function $(id) { return document.getElementById(id); }
+function safe(v) { return escapeHtml(v); }
+function money(v) { return 'NT$ ' + Number(v || 0).toLocaleString('zh-TW'); }
+function fmt(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function setMsg(id, text, ok) { var el = $(id); el.className = 'form-msg ' + (ok ? 'ok' : 'err'); el.innerText = text || ''; }
+
+function adminApi(action, payload) {
+  return api(action, Object.assign({ password:adminPassword }, payload || {})).then(function (r) {
+    if (r && !r.success && /沒有管理權限/.test(r.message || '')) { logout(); throw Object.assign(new Error(r.message), { isApi:true }); }
+    return r;
+  });
+}
+
+function store(k, v) { try { v == null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch (e) {} }
+function load(k) { try { return sessionStorage.getItem(k) || ''; } catch (e) { return ''; } }
+
+/* ---------- 登入 ---------- */
+function login(saved) {
+  var p = saved || $('password').value;
+  if (!p) return;
+  var btn = $('loginBtn');
+  btn.disabled = true; btn.innerText = '登入中……';
+  $('loginMessage').innerText = '';
+
+  api('adminLogin', { password:p }).then(function (r) {
+    btn.disabled = false; btn.innerText = '登入管理';
+    if (!r.success) { $('loginMessage').innerText = r.message || '登入失敗'; store('bb_admin', null); return; }
+    adminPassword = p;
+    store('bb_admin', p);
+    $('loginArea').classList.add('hidden');
+    $('adminArea').classList.remove('hidden');
+    initClosureSlots();
+    switchTab('calendar');
+  }).catch(function (e) {
+    btn.disabled = false; btn.innerText = '登入管理';
+    $('loginMessage').innerText = '登入失敗：' + e.message;
+  });
+}
+
+function logout() {
+  adminPassword = '';
+  store('bb_admin', null);
+  $('adminArea').classList.add('hidden');
+  $('loginArea').classList.remove('hidden');
+  $('password').value = '';
+}
+
+$('password').addEventListener('keydown', function (e) { if (e.key === 'Enter') login(); });
+
+/* ---------- 分頁 ---------- */
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.admin-tab').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === tab); });
+  ['calendar','courses','closures'].forEach(function (t) { $('panel-' + t).classList.toggle('hidden', t !== tab); });
+  refreshCurrent();
+}
+
+function refreshCurrent() {
+  if (currentTab === 'calendar') loadMonth();
+  else if (currentTab === 'courses') loadCourses();
+  else loadClosures();
+}
+
+/* ================= 預約月曆 ================= */
+function previousMonth() { currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1); loadMonth(); }
+function nextMonth() { currentDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1); loadMonth(); }
+
+function loadMonth() {
+  var y = currentDate.getFullYear(), m = currentDate.getMonth() + 1, ms = y + '-' + String(m).padStart(2, '0');
+  $('monthTitle').innerText = y + ' 年 ' + m + ' 月';
+  $('calendar').innerHTML = '<div class="empty-note" style="grid-column:1/-1">載入中……</div>';
+
+  adminApi('adminMonth', { month:ms }).then(function (r) {
+    if (!r || !r.success) { $('calendar').innerHTML = '<div class="empty-note" style="grid-column:1/-1">讀取失敗：' + safe(r && r.message) + '</div>'; return; }
+    month = r;
+    SLOTS = r.slots;
+    renderSummary(r.summary);
+    renderCalendar();
+  }).catch(function (e) {
+    $('calendar').innerHTML = '<div class="empty-note" style="grid-column:1/-1">讀取失敗：' + safe(e.message) + '</div>';
+  });
+}
+
+function renderSummary(s) {
+  $('activeCount').innerText = s.activeCount;
+  $('expectedRevenue').innerText = money(s.expectedRevenue);
+  $('paidRevenue').innerText = money(s.paidRevenue);
+  $('unpaidRevenue').innerText = money(s.unpaidRevenue);
+  $('cancelledCount').innerText = s.cancelledCount;
+}
+
+function closuresOn(ds) {
+  var whole = null, slots = {};
+  month.closures.forEach(function (c) {
+    if (c.date !== ds) return;
+    if (c.slot === WHOLE_DAY) whole = c; else slots[c.slot] = c;
+  });
+  return { whole:whole, slots:slots };
+}
+
+function slotUsage(list) {
+  return list.reduce(function (n, b) { return n + (month.capacityUnit === 'child' ? (b.childrenCount || 1) : 1); }, 0);
+}
+
+function renderCalendar() {
+  var c = $('calendar'); c.innerHTML = '';
+  var y = currentDate.getFullYear(), m = currentDate.getMonth(), first = new Date(y, m, 1), last = new Date(y, m + 1, 0);
+
+  for (var i = 0; i < first.getDay(); i++) { var e = document.createElement('div'); e.className = 'day'; e.style.visibility = 'hidden'; c.appendChild(e); }
+
+  var today = fmt(new Date());
+  var unit = month.capacityUnit === 'child' ? '' : '';
+
+  for (var d = 1; d <= last.getDate(); d++) {
+    (function (d) {
+      var date = new Date(y, m, d), wd = date.getDay(), ds = fmt(date);
+      var box = document.createElement('div'); box.className = 'day';
+      if (ds === today) box.classList.add('today');
+      var n = document.createElement('div'); n.className = 'day-number'; n.innerText = d; box.appendChild(n);
+
+      var cl = closuresOn(ds);
+      var dayCourses = month.courses.filter(function (x) { return x.date === ds; });
+      var weekly = month.closedWeekdays.indexOf(wd) >= 0;
+
+      if (cl.whole) {
+        box.classList.add('closed');
+        var b = document.createElement('div'); b.className = 'closure-banner';
+        b.innerText = '🚧 臨時店休' + (cl.whole.reason ? '：' + cl.whole.reason : '');
+        box.appendChild(b);
+      } else if (weekly && !dayCourses.length) {
+        box.classList.add('closed');
+        var x = document.createElement('div'); x.className = 'closed-text'; x.innerText = '公休'; box.appendChild(x);
+        c.appendChild(box);
+        return;
+      }
+
+      if (!weekly) {
+        SLOTS.forEach(function (slot) {
+          var all = month.bookings.filter(function (b) { return b.date === ds && b.timeSlot === slot && b.type !== '課程'; });
+          var active = all.filter(function (b) { return b.status === '已預約'; });
+          var used = slotUsage(active);
+          var off = cl.whole || cl.slots[slot];
+          var el = document.createElement('div');
+          el.className = 'slot ' + (off ? 'off' : used === 0 ? 'empty' : used >= month.maxBookings ? 'full' : 'open');
+          var names = active.length ? active.map(function (b) { return b.parent1; }).join('、') : (off ? '店休' : '尚無預約');
+          el.innerHTML = '<div class="slot-top"><span>' + slot.substring(0, 5) + (off ? ' 🚧' : '') + '</span><span>' + used + '/' + month.maxBookings + '</span></div><div class="names">' + safe(names) + '</div>';
+          el.onclick = function () { showBookings(ds, slot, null); };
+          box.appendChild(el);
+        });
+      } else {
+        var w = document.createElement('div'); w.className = 'closed-text'; w.innerText = '公休（僅課程）'; box.appendChild(w);
+      }
+
+      dayCourses.forEach(function (course) {
+        var el = document.createElement('div');
+        el.className = 'slot course' + (course.full ? ' full' : '');
+        el.innerHTML = '<div class="slot-top"><span>🎨 ' + safe(course.startTime) + '</span><span>' + course.used + '/' + course.capacity + '</span></div><div class="names">' + safe(course.name) + (course.status === '關閉' ? '（關閉）' : '') + '</div>';
+        el.onclick = function () { showBookings(ds, course.timeSlot, course); };
+        box.appendChild(el);
+      });
+
+      c.appendChild(box);
+    })(d);
+  }
+}
+
+function showBookings(date, slot, course) {
+  var bs = month.bookings.filter(function (b) {
+    return course ? b.courseId === course.id : (b.date === date && b.timeSlot === slot && b.type !== '課程');
+  });
+  var active = bs.filter(function (b) { return b.status === '已預約'; });
+
+  $('modalTitle').innerText = date + weekdayText(date) + '｜' + (course ? '🎨 ' + course.name + '｜' : '') + slot;
+  $('modalSubtitle').innerText = course
+    ? '已報名 ' + course.used + ' / ' + course.capacity + ' 位幼兒｜每位幼兒 ' + money(course.price)
+    : '目前 ' + slotUsage(active) + ' / ' + month.maxBookings + (month.capacityUnit === 'child' ? ' 位幼兒' : ' 組');
+
+  var c = $('modalContent'); c.innerHTML = '';
+  if (!bs.length) c.innerHTML = '<div class="booking" style="text-align:center;color:#9a8d85">這個時段目前沒有預約。</div>';
+
+  bs.forEach(function (b) {
+    var d = document.createElement('div');
+    d.className = 'booking ' + (b.status === '取消' ? 'cancelled' : '');
+    var parents = [b.parent1, b.parent2].filter(Boolean).join('、');
+    var babies = (b.babies || []).map(function (x) { return x.label; }).join('、');
+    var confirmClass = b.attendanceConfirm === '保留' ? 'confirm' : b.attendanceConfirm === '取消' ? 'cancel' : '';
+    var payClass = b.paymentStatus === '已收款' ? 'paid' : 'unpaid';
+
+    d.innerHTML =
+      '<div class="booking-title"><div class="booking-name">' + safe(b.parent1) + '</div><div class="tags">' +
+        (b.type === '課程' ? '<span class="tag course">課程</span>' : '') +
+        '<span class="tag ' + (b.status === '取消' ? 'cancel' : '') + '">' + safe(b.status) + '</span>' +
+        '<span class="tag ' + confirmClass + '">' + safe(b.attendanceConfirm || '等待回覆') + '</span>' +
+        '<span class="tag ' + payClass + '">' + safe(b.paymentStatus || '未收款') + '</span></div></div>' +
+      '<div class="info-grid">' +
+        '<div><strong>姓名：</strong>' + safe(parents || '-') + '</div>' +
+        '<div><strong>寶寶：</strong>' + safe(babies || '-') + '</div>' +
+        '<div><strong>手機：</strong>' + safe(b.phone) + '</div>' +
+        '<div><strong>Email：</strong>' + safe(b.email) + '</div>' +
+        '<div><strong>總人數：</strong>' + b.totalPeople + ' 人（幼兒 ' + b.childrenCount + ' 位）</div>' +
+        '<div><strong>應收：</strong>' + money(b.totalPrice) + '</div>' +
+        '<div><strong>24hr提醒：</strong>' + safe(b.reminderStatus || '未寄送') + '</div>' +
+        '<div><strong>確認時間：</strong>' + safe(b.confirmedAt || '-') + '</div>' +
+        '<div><strong>收款時間：</strong>' + safe(b.paymentAt || '-') + '</div>' +
+        '<div><strong>來訪需求：</strong>' + safe(b.needs || '未填寫') + '</div>' +
+        '<div><strong>其他：</strong>' + safe(b.otherNeed || '-') + '</div>' +
+        '<div><strong>預約編號：</strong>' + safe(b.bookingId) + '</div>' +
+      '</div>';
+
+    if (b.status !== '取消') {
+      var a = document.createElement('div'); a.className = 'payment-actions';
+      var payBtn = document.createElement('button');
+      payBtn.className = 'btn ' + (b.paymentStatus === '已收款' ? 'secondary' : 'paid');
+      payBtn.innerText = b.paymentStatus === '已收款' ? '改回未收款' : '現場已收款';
+      payBtn.onclick = function () { setPayment(b.bookingId, b.paymentStatus !== '已收款', payBtn); };
+      var cancelBtn = document.createElement('button');
+      cancelBtn.className = 'btn cancel'; cancelBtn.innerText = '取消預約';
+      a.appendChild(payBtn); a.appendChild(cancelBtn); d.appendChild(a);
+
+      var cb = document.createElement('div'); cb.className = 'admin-cancel-confirm hidden';
+      cb.innerHTML = '<strong>確定要取消這筆預約嗎？取消後會寄信通知家長、發送 LINE 群組通知，並釋出名額。</strong>' +
+        '<div class="f" style="margin-bottom:10px"><input placeholder="取消原因（選填，會寫在通知信）" maxlength="60"></div>' +
+        '<div class="admin-cancel-actions"><button class="btn cancel">確定取消</button><button class="btn light">返回</button></div>';
+      var btns = cb.querySelectorAll('button');
+      btns[0].onclick = function () { adminCancel(b.bookingId, cb.querySelector('input').value, btns[0]); };
+      btns[1].onclick = function () { cb.classList.add('hidden'); };
+      cancelBtn.onclick = function () { cb.classList.remove('hidden'); };
+      d.appendChild(cb);
+    }
+    c.appendChild(d);
+  });
+
+  $('overlay').style.display = 'flex';
+}
+
+function setPayment(id, paid, btn) {
+  if (!confirm(paid ? '確認這筆預約已完成現場收款嗎？' : '確認要把這筆預約改回未收款嗎？')) return;
+  btn.disabled = true;
+  adminApi('setPayment', { id:id, paid:paid }).then(function (r) {
+    btn.disabled = false;
+    if (!r.success) { alert(r.message); return; }
+    closeModal(); loadMonth();
+  }).catch(function (e) { btn.disabled = false; alert(e.message); });
+}
+
+function adminCancel(id, reason, btn) {
+  btn.disabled = true; btn.innerText = '處理中……';
+  adminApi('adminCancel', { id:id, reason:reason }).then(function (r) {
+    if (!r.success) { btn.disabled = false; btn.innerText = '確定取消'; alert(r.message || '取消失敗'); return; }
+    closeModal(); refreshCurrent();
+  }).catch(function (e) { btn.disabled = false; btn.innerText = '確定取消'; alert(e.message); });
+}
+
+function closeModal() { $('overlay').style.display = 'none'; }
+function overlayClick(e) { if (e.target.id === 'overlay') closeModal(); }
+
+/* ================= 才藝課程 ================= */
+var DEFAULT_CAPACITY = 4;
+
+function loadCourses() {
+  $('courseList').innerHTML = '<div class="empty-note">載入中……</div>';
+  adminApi('adminCourses').then(function (r) {
+    if (!r.success) { $('courseList').innerHTML = '<div class="empty-note">讀取失敗：' + safe(r.message) + '</div>'; return; }
+    adminCourses = r.courses;
+    DEFAULT_CAPACITY = r.defaultCapacity || 4;
+    if (!$('cId').value && !$('cCapacity').value) $('cCapacity').value = DEFAULT_CAPACITY;
+    renderCourseList(r.today);
+  }).catch(function (e) { $('courseList').innerHTML = '<div class="empty-note">讀取失敗：' + safe(e.message) + '</div>'; });
+}
+
+function courseLink(id) {
+  return location.href.replace(/admin\.html.*$/, '') + 'index.html?course=' + encodeURIComponent(id);
+}
+
+function renderCourseList(today) {
+  var box = $('courseList'); box.innerHTML = '';
+  if (!adminCourses.length) { box.innerHTML = '<div class="empty-note">還沒有課程，從上方新增第一堂課吧。</div>'; return; }
+
+  adminCourses.forEach(function (c) {
+    var past = c.date < today;
+    var row = document.createElement('div');
+    row.className = 'row-item' + (past ? ' past' : '') + (c.status === '關閉' ? ' closedc' : '');
+    row.innerHTML =
+      '<div class="row-main"><div class="row-title">🎨 ' + safe(c.name) + (c.status === '關閉' ? '（關閉中）' : '') + (past ? '（已結束）' : '') + '</div>' +
+      '<div class="row-sub">' + safe(c.date) + weekdayText(c.date) + '　' + safe(c.timeSlot) + '　每位幼兒 ' + money(c.price) +
+      '　已報名 ' + c.used + ' / ' + c.capacity + ' 位幼兒' + (c.full ? '（額滿）' : '') + '</div></div>' +
+      '<div class="row-actions"></div>';
+
+    var act = row.querySelector('.row-actions');
+    function add(label, cls, fn) { var b = document.createElement('button'); b.className = 'btn ' + cls; b.innerText = label; b.onclick = fn; act.appendChild(b); }
+
+    add('報名名單', 'secondary', function () {
+      var monthKey = c.date.slice(0, 7);
+      adminApi('adminMonth', { month:monthKey }).then(function (r) {
+        if (!r.success) return alert(r.message);
+        month = r;
+        var fresh = r.courses.find(function (x) { return x.id === c.id; }) || c;
+        showBookings(c.date, c.timeSlot, fresh);
+      }).catch(function (e) { alert(e.message); });
+    });
+    add('編輯', 'secondary', function () { editCourse(c); });
+    add(c.status === '開放' ? '關閉報名' : '重新開放', 'light', function () {
+      var copy = Object.assign({}, c, { status:c.status === '開放' ? '關閉' : '開放' });
+      submitCourse(copy, null);
+    });
+    if (!past && c.status === '開放') add('複製報名連結', 'light', function () {
+      var link = courseLink(c.id);
+      (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(
+        function () { alert('已複製報名連結：\n' + link); },
+        function () { prompt('請複製報名連結：', link); }
+      );
+    });
+    if (c.used === 0) add('刪除', 'cancel', function () {
+      if (!confirm('確定要刪除「' + c.name + '」嗎？')) return;
+      adminApi('deleteCourse', { id:c.id }).then(function (r) { alert(r.message); if (r.success) loadCourses(); }).catch(function (e) { alert(e.message); });
+    });
+
+    box.appendChild(row);
+  });
+}
+
+function editCourse(c) {
+  $('cId').value = c.id; $('cName').value = c.name; $('cDate').value = c.date;
+  $('cStart').value = c.startTime; $('cEnd').value = c.endTime; $('cPrice').value = c.price;
+  $('cCapacity').value = c.capacity; $('cStatus').value = c.status; $('cDesc').value = c.description || '';
+  $('courseFormTitle').innerText = '編輯課程：' + c.name;
+  $('courseCancelEdit').classList.remove('hidden');
+  setMsg('courseMsg', c.used ? '這堂課已有 ' + c.used + ' 位幼兒報名。修改日期或時間後，系統會自動寄信通知已報名的家長。' : '', true);
+  window.scrollTo({ top:0, behavior:'smooth' });
+}
+
+function resetCourseForm() {
+  ['cId','cName','cDate','cStart','cEnd','cPrice','cDesc'].forEach(function (id) { $(id).value = ''; });
+  $('cCapacity').value = DEFAULT_CAPACITY; $('cStatus').value = '開放';
+  $('courseFormTitle').innerText = '新增才藝課程';
+  $('courseCancelEdit').classList.add('hidden');
+}
+
+function saveCourse() {
+  var course = {
+    id:$('cId').value, name:$('cName').value.trim(), date:$('cDate').value,
+    startTime:$('cStart').value, endTime:$('cEnd').value,
+    price:$('cPrice').value, capacity:$('cCapacity').value,
+    status:$('cStatus').value, description:$('cDesc').value.trim()
+  };
+  if (!course.name || !course.date || !course.startTime || !course.endTime || course.price === '' || !course.capacity) {
+    return setMsg('courseMsg', '請把有 * 的欄位都填好。', false);
+  }
+  submitCourse(course, $('courseSaveBtn'));
+}
+
+function submitCourse(course, btn) {
+  if (btn) { btn.disabled = true; btn.innerText = '儲存中……'; }
+  adminApi('saveCourse', { course:course }).then(function (r) {
+    if (btn) { btn.disabled = false; btn.innerText = '儲存課程'; }
+    setMsg('courseMsg', r.message, r.success);
+    if (r.success) { if (btn) resetCourseForm(); loadCourses(); }
+  }).catch(function (e) {
+    if (btn) { btn.disabled = false; btn.innerText = '儲存課程'; }
+    setMsg('courseMsg', e.message, false);
+  });
+}
+
+/* ================= 臨時店休 ================= */
+function initClosureSlots() {
+  var s = $('xSlot');
+  s.innerHTML = '<option value="整天">整天店休（含當天課程）</option>' +
+    SLOTS.map(function (x) { return '<option value="' + x + '">只關 ' + x + '</option>'; }).join('');
+  $('xDate').min = fmt(new Date());
+}
+
+function loadClosures() {
+  $('closureList').innerHTML = '<div class="empty-note">載入中……</div>';
+  adminApi('closureList').then(function (r) {
+    if (!r.success) { $('closureList').innerHTML = '<div class="empty-note">讀取失敗：' + safe(r.message) + '</div>'; return; }
+    if (r.slots && r.slots.join() !== SLOTS.join()) { SLOTS = r.slots; initClosureSlots(); }
+    renderClosures(r.closures);
+  }).catch(function (e) { $('closureList').innerHTML = '<div class="empty-note">讀取失敗：' + safe(e.message) + '</div>'; });
+}
+
+function renderClosures(list) {
+  var box = $('closureList'); box.innerHTML = '';
+  if (!list.length) { box.innerHTML = '<div class="empty-note">目前沒有設定臨時店休。</div>'; return; }
+
+  list.forEach(function (c) {
+    var row = document.createElement('div'); row.className = 'row-item';
+    row.innerHTML = '<div class="row-main"><div class="row-title">🚧 ' + safe(c.date) + weekdayText(c.date) + '　' + safe(c.slot === WHOLE_DAY ? '整天' : c.slot) + '</div>' +
+      '<div class="row-sub">' + safe(c.reason || '（未填原因）') + '</div></div><div class="row-actions"></div>';
+    var b = document.createElement('button'); b.className = 'btn light'; b.innerText = '取消店休（重新開放）';
+    b.onclick = function () {
+      if (!confirm('確定要取消 ' + c.date + ' ' + c.slot + ' 的店休，重新開放預約嗎？\n（之前因店休被取消的預約不會自動恢復）')) return;
+      adminApi('removeClosure', { id:c.id }).then(function (r) { alert(r.message); loadClosures(); }).catch(function (e) { alert(e.message); });
+    };
+    row.querySelector('.row-actions').appendChild(b);
+    box.appendChild(row);
+  });
+}
+
+var previewSeq = 0;
+function previewClosure() {
+  var date = $('xDate').value, slot = $('xSlot').value, box = $('xAffected');
+  setMsg('closureMsg', '', true);
+  if (!date) { box.innerHTML = ''; return; }
+  var seq = ++previewSeq;
+  box.innerHTML = '<div class="affected">正在檢查這段時間的預約……</div>';
+
+  adminApi('closurePreview', { date:date, slot:slot }).then(function (r) {
+    if (seq !== previewSeq) return;
+    if (!r.success) { box.innerHTML = '<div class="affected">' + safe(r.message) + '</div>'; return; }
+    if (!r.count) { box.innerHTML = '<div class="affected" style="background:#f2f6ea;border-color:#dbe5c8">這段時間目前沒有有效預約，可以直接設定店休。</div>'; return; }
+
+    box.innerHTML = '<div class="affected"><strong>這段時間已有 ' + r.count + ' 筆預約：</strong><br>' +
+      r.bookings.map(function (b) {
+        return '・' + safe(b.timeSlot) + '　' + safe(b.parent1) + (b.type === '課程' ? '（課程：' + safe(b.courseName) + '）' : '') + '　幼兒 ' + b.childrenCount + ' 位';
+      }).join('<br>') +
+      '<label><input type="checkbox" id="xCancel" checked> 同時取消這些預約，並寄信通知家長（也會推送 LINE 群組通知）</label></div>';
+  }).catch(function (e) { if (seq === previewSeq) box.innerHTML = '<div class="affected">檢查失敗：' + safe(e.message) + '</div>'; });
+}
+
+function addClosure() {
+  var date = $('xDate').value, slot = $('xSlot').value, reason = $('xReason').value.trim();
+  if (!date) return setMsg('closureMsg', '請選擇店休日期。', false);
+  var cancelBox = $('xCancel');
+  var cancelExisting = !!(cancelBox && cancelBox.checked);
+
+  if (!confirm('確定要設定 ' + date + ' ' + (slot === WHOLE_DAY ? '整天' : slot) + ' 臨時店休嗎？' + (cancelExisting ? '\n已勾選：同時取消既有預約並通知家長。' : ''))) return;
+
+  var btn = $('closureBtn'); btn.disabled = true; btn.innerText = '設定中……';
+  adminApi('addClosure', { date:date, slot:slot, reason:reason, cancelExisting:cancelExisting }).then(function (r) {
+    btn.disabled = false; btn.innerText = '設定店休';
+    setMsg('closureMsg', r.message, r.success);
+    if (r.success) { $('xDate').value = ''; $('xReason').value = ''; $('xAffected').innerHTML = ''; loadClosures(); }
+  }).catch(function (e) { btn.disabled = false; btn.innerText = '設定店休'; setMsg('closureMsg', e.message, false); });
+}
+
+/* ---------- 啟動 ---------- */
+(function () {
+  var saved = load('bb_admin');
+  if (saved) login(saved);
+})();
+</script>
+</body>
+</html>

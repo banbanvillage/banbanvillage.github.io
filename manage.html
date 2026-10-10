@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<title>伴伴村莊｜我的預約</title>
+<link rel="icon" href="logo.jpg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrapper">
+  <div class="hero">
+    <img class="logo" src="logo.jpg" alt="伴伴村莊 Logo">
+    <h1>伴伴村莊</h1>
+    <div class="subtitle">大人有伴，孩子也有伴。</div>
+  </div>
+
+  <div id="manageLoading" class="card" style="text-align:center">正在讀取你的預約資料……</div>
+
+  <div id="manageError" class="card hidden" style="text-align:center">
+    <div class="section-title">🌿 我的預約</div>
+    <div class="notice" id="manageErrorText" style="margin-bottom:0">找不到這筆預約，或預約連結已失效。</div>
+    <div class="small-note" id="manageErrorHint">請確認你點的是最新一封預約信中的連結；若仍有問題，歡迎直接聯繫伴伴村莊。</div>
+    <button type="button" class="secondary-btn hidden" id="retryBtn" style="margin-top:14px" onclick="loadBooking()">重新讀取</button>
+  </div>
+
+  <div id="manageSuccess" class="success-box hidden" style="margin-bottom:18px">
+    <div style="font-size:52px" id="manageSuccessIcon">🌷</div>
+    <h2 id="manageSuccessTitle" style="color:#a96e4e"></h2>
+    <p id="manageSuccessText"></p>
+  </div>
+
+  <div id="manageArea" class="card hidden">
+    <div class="section-title">🌿 我的預約</div>
+    <div id="manageBookingInfo" class="booking-info"></div>
+    <div id="manageStatus" class="status-row"></div>
+    <div id="manageNotice" class="notice"></div>
+
+    <div id="manageActions">
+      <div class="actions" id="actionButtons">
+        <button type="button" class="confirm-btn" onclick="showConfirm('confirm')">保留這次預約</button>
+        <button type="button" class="cancel-btn" onclick="showConfirm('cancel')">取消這次預約</button>
+      </div>
+
+      <div id="confirmBox" class="inline-confirm hidden">
+        <div class="inline-confirm-title" id="confirmTitle"></div>
+        <div class="inline-confirm-actions">
+          <button type="button" id="confirmGo" onclick="doRespond()">確定</button>
+          <button type="button" class="secondary-btn" onclick="hideConfirm()">返回</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="manageMessage" class="message"></div>
+  </div>
+
+  <div style="text-align:center;margin-top:8px"><a class="link-btn" href="index.html">回到預約頁面</a></div>
+</div>
+
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script>
+var BOOKING_ID = qs('id').trim();
+var TOKEN = qs('token').trim();
+var pendingOp = '';
+
+function show(id, on) { document.getElementById(id).classList.toggle('hidden', !on); }
+
+function showError(text, canRetry) {
+  show('manageLoading', false);
+  show('manageArea', false);
+  show('manageError', true);
+  document.getElementById('manageErrorText').innerText = text || '找不到這筆預約，或預約連結已失效。';
+  show('retryBtn', !!canRetry);
+}
+
+function loadBooking() {
+  show('manageError', false);
+  show('manageLoading', true);
+
+  if (!BOOKING_ID || !TOKEN) {
+    showError('找不到這筆預約，或預約連結已失效。', false);
+    return;
+  }
+
+  api('getBooking', { id:BOOKING_ID, token:TOKEN })
+    .then(function (r) {
+      if (!r || !r.success) {
+        showError((r && r.message) || '找不到這筆預約，或預約連結已失效。', false);
+        return;
+      }
+      render(r);
+    })
+    .catch(function (err) {
+      showError(err.message, true);
+    });
+}
+
+function render(r) {
+  show('manageLoading', false);
+  show('manageError', false);
+  show('manageArea', true);
+
+  var parents = [r.parent1, r.parent2].filter(Boolean).join('、');
+  var babies = (r.babies || []).map(function (b) { return b.label; }).join('、');
+
+  document.getElementById('manageBookingInfo').innerHTML =
+    '<strong>預約項目</strong><br>' + escapeHtml(r.type === '課程' ? '才藝課程：' + r.courseName : '一般入村預約') +
+    '<br><br><strong>預約編號</strong><br>' + escapeHtml(r.bookingId) +
+    '<br><br><strong>日期</strong><br>' + escapeHtml(r.date) + weekdayText(r.date) +
+    '<br><br><strong>時段</strong><br>' + escapeHtml(r.timeSlot) +
+    '<br><br><strong>家長</strong><br>' + escapeHtml(parents || '-') +
+    '<br><br><strong>寶寶</strong><br>' + escapeHtml(babies || '-') +
+    '<br><br><strong>預約人數</strong><br>' + r.totalPeople + ' 人（幼兒 ' + r.childrenCount + ' 位）' +
+    '<br><br><strong>預估費用</strong><br>NT$ ' + r.totalPrice;
+
+  var c = document.getElementById('manageStatus');
+  var confirmState = r.attendanceConfirm || '等待回覆';
+  c.innerHTML =
+    '<span class="status-pill' + (r.status === '取消' ? ' cancel' : '') + '">預約狀態：' + escapeHtml(r.status) + '</span>' +
+    '<span class="status-pill' + (confirmState === '保留' ? ' good' : confirmState === '取消' ? ' cancel' : '') + '">到訪確認：' + escapeHtml(confirmState) + '</span>' +
+    '<span class="status-pill' + (r.paymentStatus === '已收款' ? ' good' : '') + '">收款狀態：' + escapeHtml(r.paymentStatus || '未收款') + '</span>';
+
+  var notice = document.getElementById('manageNotice');
+  hideConfirm();
+
+  if (r.status === '取消') {
+    notice.innerText = '這筆預約已經取消，該時段名額已重新釋出。';
+    show('manageActions', false);
+  } else if (r.isPast) {
+    notice.innerText = '這筆預約的日期已經過了，謝謝你來伴伴村莊 🌿';
+    show('manageActions', false);
+  } else if (confirmState === '保留') {
+    notice.innerText = '你已經確認保留這次預約。如果後續行程有變，仍可在這裡取消。';
+    show('manageActions', true);
+  } else {
+    notice.innerHTML = '如果時間沒有變動，可以選擇「保留這次預約」。<br>如果無法前來，請選擇「取消這次預約」，名額就會重新開放給其他家庭。';
+    show('manageActions', true);
+  }
+}
+
+function showConfirm(op) {
+  pendingOp = op;
+  document.getElementById('confirmTitle').innerText = op === 'confirm'
+    ? '確定要保留這次預約嗎？'
+    : '確定要取消這次預約嗎？取消後名額會立即重新開放。';
+  var go = document.getElementById('confirmGo');
+  go.className = op === 'confirm' ? 'confirm-btn' : 'cancel-btn';
+  go.innerText = op === 'confirm' ? '確定保留' : '確定取消';
+  go.disabled = false;
+  show('confirmBox', true);
+  document.getElementById('manageMessage').innerText = '';
+}
+
+function hideConfirm() { show('confirmBox', false); }
+
+function doRespond() {
+  var op = pendingOp;
+  var go = document.getElementById('confirmGo');
+  var msg = document.getElementById('manageMessage');
+  go.disabled = true;
+  go.innerText = '正在處理……';
+
+  api('respond', { op:op, id:BOOKING_ID, token:TOKEN })
+    .then(function (r) {
+      if (!r || !r.success) {
+        go.disabled = false;
+        go.innerText = op === 'confirm' ? '確定保留' : '確定取消';
+        msg.innerText = (r && r.message) || '操作失敗，請稍後再試。';
+        return;
+      }
+
+      document.getElementById('manageSuccessIcon').innerText = r.action === 'cancel' ? '🌱' : '🌷';
+      document.getElementById('manageSuccessTitle').innerText = r.action === 'cancel' ? '預約已取消' : '已保留這次預約';
+      document.getElementById('manageSuccessText').innerText = r.message;
+      show('manageSuccess', true);
+      window.scrollTo(0, 0);
+      return api('getBooking', { id:BOOKING_ID, token:TOKEN }).then(function (b) { if (b && b.success) render(b); });
+    })
+    .catch(function (err) {
+      go.disabled = false;
+      go.innerText = op === 'confirm' ? '確定保留' : '確定取消';
+      msg.innerText = err.message;
+    });
+}
+
+loadBooking();
+</script>
+</body>
+</html>

@@ -14,7 +14,7 @@
     <h1>伴伴村莊</h1>
     <div class="subtitle">大人有伴，孩子也有伴。<br>選一個舒服的時間，一起來村莊坐坐吧。</div>
     <div class="badges">
-      <span class="badge" id="badgeCapacity">每時段最多 4 組</span>
+      <span class="badge" id="badgeCapacity">每時段最多 4 位幼兒</span>
       <span class="badge">週三、週日公休</span>
       <span class="badge">1 大 1 小 NT$300</span>
     </div>
@@ -29,7 +29,7 @@
     <!-- 一般預約：日期與時段 -->
     <div class="card" id="generalPick">
       <div class="section-title">🌿 選擇日期與時段</div>
-      <div class="notice" id="generalNotice">每個時段最多開放 <strong>4 組親子</strong>。<br>額滿後就不能再選，週三、週日為公休日。</div>
+      <div class="notice" id="generalNotice">每個時段最多開放 <strong>4 位幼兒</strong>（依報名幼兒人數計算）。<br>額滿或安排才藝課程的時段不能選，週三、週日為公休日。</div>
       <div class="field">
         <label>預約日期 <span class="required">*</span></label>
         <input type="date" id="bookingDate" onchange="loadAvailability()">
@@ -102,7 +102,8 @@
 <script src="config.js"></script>
 <script src="common.js"></script>
 <script>
-var CFG = { maxBookings:4, capacityUnit:'group', basePrice:300, extraPrice:100 };
+var CFG = { maxBookings:4, capacityUnit:'child', basePrice:300, extraPrice:100 };
+var selectedSlotRemaining = 99;
 var mode = 'general';
 var selectedSlot = '';
 var selectedCourse = null;
@@ -129,7 +130,7 @@ function applyConfig() {
   var unit = CFG.capacityUnit === 'child' ? '位幼兒' : '組';
   document.getElementById('badgeCapacity').innerText = '每時段最多 ' + CFG.maxBookings + ' ' + unit;
   document.getElementById('generalNotice').innerHTML =
-    '每個時段最多開放 <strong>' + CFG.maxBookings + (CFG.capacityUnit === 'child' ? ' 位幼兒' : ' 組親子') + '</strong>。<br>額滿後就不能再選，週三、週日為公休日。';
+    '每個時段最多開放 <strong>' + CFG.maxBookings + (CFG.capacityUnit === 'child' ? ' 位幼兒</strong>（依報名幼兒人數計算）' : ' 組親子</strong>') + '。<br>額滿或安排才藝課程的時段不能選，週三、週日為公休日。';
   updatePrice();
 }
 
@@ -191,7 +192,7 @@ function showAvailability(r) {
     d.className = 'slot' + (item.closed ? ' closed' : item.full ? ' disabled' : '');
     var p = Math.min(100, item.count / item.capacity * 100);
     var label = item.closed
-      ? '臨時暫停開放' + (item.closedReason ? '（' + escapeHtml(item.closedReason) + '）' : '')
+      ? (item.course ? '已安排' + escapeHtml(item.closedReason) : '臨時暫停開放' + (item.closedReason ? '（' + escapeHtml(item.closedReason) + '）' : ''))
       : (item.full ? '已額滿 ' : '目前 ') + item.count + ' / ' + item.capacity + ' ' + unit;
     d.innerHTML = '<div class="slot-time">' + escapeHtml(item.slot) + '</div><div class="slot-count">' + label + '</div>' +
       (item.closed ? '' : '<div class="slot-bar"><span style="width:' + p + '%"></span></div>');
@@ -200,6 +201,7 @@ function showAvailability(r) {
         document.querySelectorAll('#slots .slot').forEach(function (x) { x.classList.remove('selected'); });
         d.classList.add('selected');
         selectedSlot = item.slot;
+        selectedSlotRemaining = item.remaining;
       };
     }
     c.appendChild(d);
@@ -295,6 +297,9 @@ function submitBooking() {
   if (mode === 'general') {
     if (!val('bookingDate')) return err('請選擇預約日期');
     if (!selectedSlot) return err('請選擇預約時段');
+    if (CFG.capacityUnit === 'child' && childrenCount() > selectedSlotRemaining) {
+      return err('這個時段只剩 ' + selectedSlotRemaining + ' 位幼兒名額，請調整人數或改選其他時段');
+    }
   } else {
     if (!selectedCourse) return err('請選擇要報名的課程');
   }

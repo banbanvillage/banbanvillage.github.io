@@ -35,6 +35,7 @@
     <button class="admin-tab active" data-tab="calendar" onclick="switchTab('calendar')">📅 預約月曆</button>
     <button class="admin-tab" data-tab="courses" onclick="switchTab('courses')">🎨 才藝課程</button>
     <button class="admin-tab" data-tab="closures" onclick="switchTab('closures')">🚧 臨時店休</button>
+    <button class="admin-tab" data-tab="create" onclick="switchTab('create')">➕ 新增預約</button>
   </div>
 
   <!-- ============ 預約月曆 ============ -->
@@ -54,7 +55,7 @@
           <button class="btn secondary" onclick="nextMonth()">下個月 ›</button>
         </div>
         <div class="legend">
-          <span><i class="dot empty"></i> 0 組</span>
+          <span><i class="dot empty"></i> 尚無預約</span>
           <span><i class="dot open"></i> 尚有名額</span>
           <span><i class="dot full"></i> 已額滿</span>
           <span><i class="dot course"></i> 才藝課程</span>
@@ -112,6 +113,40 @@
     <div class="card">
       <div class="panel-title">即將到來的臨時店休</div>
       <div id="closureList" class="list"><div class="empty-note">載入中……</div></div>
+    </div>
+  </div>
+
+  <!-- ============ 手動新增預約 ============ -->
+  <div id="panel-create" class="hidden">
+    <div class="card">
+      <div class="panel-title">手動新增預約（LINE／電話／口頭）</div>
+      <div class="form-grid">
+        <div class="f"><label>預約類型 *</label><select id="nType" onchange="onCreateTypeChange()"><option value="general">一般入村預約</option><option value="course">才藝課程</option></select></div>
+        <div class="f"><label>預約來源 *</label><select id="nSource"><option>LINE</option><option>電話</option><option>口頭</option><option>其他</option></select></div>
+        <div class="f nGeneral"><label>日期 *</label><input id="nDate" type="date" onchange="loadCreateSlots()"></div>
+        <div class="f nGeneral"><label>時段 *</label><select id="nSlot"></select></div>
+        <div class="f span2 nCourse hidden"><label>課程 *</label><select id="nCourse"></select></div>
+        <div class="f span4" id="nSlotInfo" style="font-size:13px;color:#86776d"></div>
+        <div class="f"><label>家長姓名 *</label><input id="nParent1" maxlength="50"></div>
+        <div class="f"><label>第二位家長</label><input id="nParent2" maxlength="50"></div>
+        <div class="f"><label>手機</label><input id="nPhone" type="tel" maxlength="20" placeholder="手機或 Email 至少填一項"></div>
+        <div class="f"><label>Email</label><input id="nEmail" type="email" maxlength="100" placeholder="有填才會寄確認信"></div>
+        <div class="f"><label>寶寶 1 姓名 *</label><input id="nBaby1" maxlength="30"></div>
+        <div class="f"><label>寶寶 1 年齡（選填）</label><div style="display:flex;gap:6px"><select id="nBaby1AgeY"></select><select id="nBaby1AgeM"></select></div></div>
+        <div class="f"><label>寶寶 2 姓名</label><input id="nBaby2" maxlength="30"></div>
+        <div class="f"><label>寶寶 2 年齡（選填）</label><div style="display:flex;gap:6px"><select id="nBaby2AgeY"></select><select id="nBaby2AgeM"></select></div></div>
+        <div class="f"><label>寶寶 3 姓名</label><input id="nBaby3" maxlength="30"></div>
+        <div class="f"><label>寶寶 3 年齡（選填）</label><div style="display:flex;gap:6px"><select id="nBaby3AgeY"></select><select id="nBaby3AgeM"></select></div></div>
+        <div class="f"><label>自訂應收金額（選填）</label><input id="nPrice" type="number" min="0" step="10" placeholder="留白＝依規則自動計算"></div>
+        <div class="f"><label>備註</label><input id="nNote" maxlength="200"></div>
+      </div>
+      <div class="checks">
+        <label><input type="checkbox" id="nSendEmail" checked> 有填 Email 時，寄確認信給家長（信中有「管理我的預約」連結）</label>
+        <label><input type="checkbox" id="nNotifyLine" checked> 推送 LINE 群組通知</label>
+        <label><input type="checkbox" id="nForce"> 忽略名額／公休／店休／課程時段限制，強制新增</label>
+      </div>
+      <div class="form-actions"><button class="btn" id="createBtn" onclick="adminCreate()">新增預約</button><button class="btn light" onclick="resetCreateForm()">清空</button></div>
+      <div class="form-msg" id="createMsg"></div>
     </div>
   </div>
 </div>
@@ -191,14 +226,15 @@ $('password').addEventListener('keydown', function (e) { if (e.key === 'Enter') 
 function switchTab(tab) {
   currentTab = tab;
   document.querySelectorAll('.admin-tab').forEach(function (b) { b.classList.toggle('active', b.dataset.tab === tab); });
-  ['calendar','courses','closures'].forEach(function (t) { $('panel-' + t).classList.toggle('hidden', t !== tab); });
+  ['calendar','courses','closures','create'].forEach(function (t) { $('panel-' + t).classList.toggle('hidden', t !== tab); });
   refreshCurrent();
 }
 
 function refreshCurrent() {
   if (currentTab === 'calendar') loadMonth();
   else if (currentTab === 'courses') loadCourses();
-  else loadClosures();
+  else if (currentTab === 'closures') loadClosures();
+  else initCreateForm();
 }
 
 /* ================= 預約月曆 ================= */
@@ -280,10 +316,11 @@ function renderCalendar() {
           var active = all.filter(function (b) { return b.status === '已預約'; });
           var used = slotUsage(active);
           var off = cl.whole || cl.slots[slot];
+          var courseBlock = courseOverlap(dayCourses, slot);
           var el = document.createElement('div');
-          el.className = 'slot ' + (off ? 'off' : used === 0 ? 'empty' : used >= month.maxBookings ? 'full' : 'open');
-          var names = active.length ? active.map(function (b) { return b.parent1; }).join('、') : (off ? '店休' : '尚無預約');
-          el.innerHTML = '<div class="slot-top"><span>' + slot.substring(0, 5) + (off ? ' 🚧' : '') + '</span><span>' + used + '/' + month.maxBookings + '</span></div><div class="names">' + safe(names) + '</div>';
+          el.className = 'slot ' + (off || courseBlock ? 'off' : used === 0 ? 'empty' : used >= month.maxBookings ? 'full' : 'open');
+          var names = active.length ? active.map(function (b) { return b.parent1; }).join('、') : (off ? '店休' : courseBlock ? '課程時段：' + courseBlock.name : '尚無預約');
+          el.innerHTML = '<div class="slot-top"><span>' + slot.substring(0, 5) + (off ? ' 🚧' : courseBlock ? ' 🎨' : '') + '</span><span>' + used + '/' + month.maxBookings + '</span></div><div class="names">' + safe(names) + '</div>';
           el.onclick = function () { showBookings(ds, slot, null); };
           box.appendChild(el);
         });
@@ -302,6 +339,13 @@ function renderCalendar() {
       c.appendChild(box);
     })(d);
   }
+}
+
+function courseOverlap(dayCourses, slot) {
+  var p = slot.split('-');
+  return dayCourses.find(function (c) {
+    return (c.status === '開放' || c.used > 0) && p[0] < c.endTime && c.startTime < p[1];
+  }) || null;
 }
 
 function showBookings(date, slot, course) {
@@ -345,6 +389,7 @@ function showBookings(date, slot, course) {
         '<div><strong>來訪需求：</strong>' + safe(b.needs || '未填寫') + '</div>' +
         '<div><strong>其他：</strong>' + safe(b.otherNeed || '-') + '</div>' +
         '<div><strong>預約編號：</strong>' + safe(b.bookingId) + '</div>' +
+        '<div><strong>預約來源：</strong>' + safe(b.source || '網站') + '</div>' +
       '</div>';
 
     if (b.status !== '取消') {
@@ -369,6 +414,15 @@ function showBookings(date, slot, course) {
     }
     c.appendChild(d);
   });
+
+  var add = document.createElement('div');
+  add.className = 'form-actions';
+  var addBtn = document.createElement('button');
+  addBtn.className = 'btn secondary';
+  addBtn.innerText = '＋ 在這個' + (course ? '課程' : '時段') + '手動新增預約';
+  addBtn.onclick = function () { closeModal(); openCreateFor(date, slot, course); };
+  add.appendChild(addBtn);
+  c.appendChild(add);
 
   $('overlay').style.display = 'flex';
 }
@@ -571,6 +625,113 @@ function addClosure() {
     setMsg('closureMsg', r.message, r.success);
     if (r.success) { $('xDate').value = ''; $('xReason').value = ''; $('xAffected').innerHTML = ''; loadClosures(); }
   }).catch(function (e) { btn.disabled = false; btn.innerText = '設定店休'; setMsg('closureMsg', e.message, false); });
+}
+
+/* ================= 手動新增預約 ================= */
+var createReady = false;
+var createPrefill = null;
+
+function fillAgeSelect(id, max, label) {
+  var h = '<option value="">' + label + '</option>';
+  for (var i = 0; i <= max; i++) h += '<option value="' + i + '">' + i + '</option>';
+  $(id).innerHTML = h;
+}
+
+function initCreateForm() {
+  if (!createReady) {
+    ['1','2','3'].forEach(function (n) { fillAgeSelect('nBaby' + n + 'AgeY', 18, '歲'); fillAgeSelect('nBaby' + n + 'AgeM', 11, '月'); });
+    $('nSlot').innerHTML = SLOTS.map(function (s) { return '<option value="' + s + '">' + s + '</option>'; }).join('');
+    $('nDate').value = fmt(new Date());
+    createReady = true;
+  }
+  var pre = createPrefill; createPrefill = null;
+  if (pre) {
+    $('nType').value = pre.course ? 'course' : 'general';
+    if (!pre.course) { $('nDate').value = pre.date; $('nSlot').value = pre.slot; }
+  }
+  onCreateTypeChange(pre && pre.course ? pre.course.id : null);
+}
+
+function openCreateFor(date, slot, course) {
+  createPrefill = { date:date, slot:slot, course:course };
+  switchTab('create');
+}
+
+function onCreateTypeChange(selectCourseId) {
+  var isCourse = $('nType').value === 'course';
+  document.querySelectorAll('.nGeneral').forEach(function (e) { e.classList.toggle('hidden', isCourse); });
+  document.querySelectorAll('.nCourse').forEach(function (e) { e.classList.toggle('hidden', !isCourse); });
+  if (isCourse) loadCreateCourses(selectCourseId); else loadCreateSlots();
+}
+
+function loadCreateCourses(selectId) {
+  $('nCourse').innerHTML = '<option value="">載入中……</option>';
+  adminApi('adminCourses').then(function (r) {
+    if (!r.success) { $('nCourse').innerHTML = '<option value="">讀取失敗</option>'; return; }
+    var list = r.courses.filter(function (c) { return c.date >= r.today; })
+      .sort(function (a, b) { return (a.date + a.startTime).localeCompare(b.date + b.startTime); });
+    $('nCourse').innerHTML = list.length
+      ? list.map(function (c) { return '<option value="' + safe(c.id) + '">' + safe(c.date + weekdayText(c.date) + ' ' + c.timeSlot + '｜' + c.name + '（' + c.used + '/' + c.capacity + ' 位）' + (c.status === '關閉' ? '［關閉］' : '')) + '</option>'; }).join('')
+      : '<option value="">目前沒有即將到來的課程</option>';
+    if (selectId) $('nCourse').value = selectId;
+    $('nSlotInfo').innerText = '課程名額以幼兒人數計算；額滿時可勾選「強制新增」。';
+  }).catch(function (e) { $('nCourse').innerHTML = '<option value="">' + safe(e.message) + '</option>'; });
+}
+
+function loadCreateSlots() {
+  var d = $('nDate').value;
+  $('nSlotInfo').innerText = '';
+  if (!d) return;
+  api('availability', { date:d }).then(function (r) {
+    if (!r.success) { $('nSlotInfo').innerText = '⚠️ ' + r.message + '（如需仍要新增，請勾選「強制新增」）'; return; }
+    $('nSlotInfo').innerText = '這天各時段：' + r.slots.map(function (s) {
+      return s.slot + ' ' + (s.closed ? (s.course ? '課程時段' : '店休') : s.count + '/' + s.capacity);
+    }).join('　');
+  }).catch(function () {});
+}
+
+function resetCreateForm() {
+  ['nParent1','nParent2','nPhone','nEmail','nBaby1','nBaby2','nBaby3','nPrice','nNote'].forEach(function (id) { $(id).value = ''; });
+  ['1','2','3'].forEach(function (n) { $('nBaby' + n + 'AgeY').value = ''; $('nBaby' + n + 'AgeM').value = ''; });
+  $('nForce').checked = false;
+  setMsg('createMsg', '', true);
+}
+
+function adminCreate() {
+  var v = function (id) { return $(id).value.trim(); };
+  var isCourse = $('nType').value === 'course';
+  var data = {
+    type:isCourse ? 'course' : 'general',
+    courseId:isCourse ? v('nCourse') : '',
+    date:isCourse ? '' : v('nDate'),
+    timeSlot:isCourse ? '' : v('nSlot'),
+    parent1:v('nParent1'), parent2:v('nParent2'),
+    phone:v('nPhone'), email:v('nEmail'),
+    baby1:v('nBaby1'), baby1AgeY:v('nBaby1AgeY'), baby1AgeM:v('nBaby1AgeM'),
+    baby2:v('nBaby2'), baby2AgeY:v('nBaby2AgeY'), baby2AgeM:v('nBaby2AgeM'),
+    baby3:v('nBaby3'), baby3AgeY:v('nBaby3AgeY'), baby3AgeM:v('nBaby3AgeM'),
+    otherNeed:v('nNote'), needs:[]
+  };
+  if (isCourse && !data.courseId) return setMsg('createMsg', '請選擇課程。', false);
+  if (!data.parent1 || !data.baby1) return setMsg('createMsg', '請填寫家長姓名和寶寶 1 姓名。', false);
+  if (!data.phone && !data.email) return setMsg('createMsg', '請至少填寫手機或 Email 其中一項。', false);
+
+  var options = {
+    source:$('nSource').value,
+    sendEmail:$('nSendEmail').checked,
+    notifyLine:$('nNotifyLine').checked,
+    force:$('nForce').checked,
+    customPrice:v('nPrice')
+  };
+
+  var btn = $('createBtn'); btn.disabled = true; btn.innerText = '新增中……';
+  adminApi('adminCreateBooking', { data:data, options:options }).then(function (r) {
+    btn.disabled = false; btn.innerText = '新增預約';
+    if (!r.success) { setMsg('createMsg', r.message + (/額滿|公休|店休|課程/.test(r.message) ? '（如確定要新增，請勾選「強制新增」）' : ''), false); return; }
+    resetCreateForm();
+    setMsg('createMsg', r.message + ' 預約編號 ' + r.bookingId + '，應收 ' + money(r.totalPrice) + '。', true);
+    if (!isCourse) loadCreateSlots();
+  }).catch(function (e) { btn.disabled = false; btn.innerText = '新增預約'; setMsg('createMsg', e.message, false); });
 }
 
 /* ---------- 啟動 ---------- */

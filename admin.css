@@ -33,3 +33,7 @@
 .affected label{display:flex;gap:8px;align-items:flex-start;margin-top:8px;font-weight:700}
 .affected input{width:auto;margin:4px 0 0}
 @media(max-width:760px){.form-grid{grid-template-columns:1fr 1fr}.form-grid .span2{grid-column:1/-1}}
+.checks{display:grid;gap:8px;margin-top:14px;font-size:14px;color:#6f625a}
+.checks label{display:flex;gap:8px;align-items:flex-start}
+.checks input{width:auto;margin:3px 0 0}
+@media(max-width:560px){.form-grid{grid-template-columns:1fr}}
